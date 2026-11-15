@@ -1,6 +1,6 @@
 'use strict';
 const TEXT = {
-  local:'V0.4-phone.1 · 手機操作預覽', headline:'四張圖，一段你寫的故事。',
+  local:'V0.4-phone.2 · 手機操作預覽', headline:'四張圖，一段你寫的故事。',
   intro:'從上圖、調整順序開始，到豆二寫台詞，馬上看滿版圖文試播。',
   new:'＋ 建立草稿', import:'匯入作品包', mine:'本頁暫存', bean1:'豆一・漫畫素材',
   save:'暫存本頁（非永久）', export:'匯出可編輯作品包', title:'作品名稱', four:'上傳四張圖片', grid:'上傳一張 2×2 合圖',
@@ -55,7 +55,7 @@ async function phoneUpload(body){
   }catch(error){throw Error('圖片無法處理：'+error.message);}finally{URL.revokeObjectURL(url);}
 }
 async function api(path,body){
-  if(path==='/api/session')return {version:'V0.4-phone.1',userId:'this-page',users:[{id:'this-page',name:'本頁'}],dataDir:'只在本頁記憶體，沒有上傳；重整或關閉後內容會消失'};
+  if(path==='/api/session')return {version:'V0.4-phone.2',userId:'this-page',users:[{id:'this-page',name:'本頁'}],dataDir:'只在本頁記憶體，沒有上傳；重整或關閉後內容會消失'};
   if(path==='/api/upload')return phoneUpload(body);
   if(path==='/api/save'){
     const value=structuredClone(body);value.id=value.id||crypto.randomUUID();value.revision++;
@@ -66,9 +66,9 @@ async function api(path,body){
   throw Error('手機操作預覽不提供此功能。');
 }
 
-function changed(){dirty=true;note(t('dirty'));}
+function changed(){dirty=true;if(window.ComicFinish)ComicFinish.stale();note(t('dirty'));}
 function canLeave(){return !dirty || confirm('尚有未保存內容，確定離開目前草稿？');}
-function show(view){if(window.ComicB)window.ComicB.stop();if(window.ComicStory)window.ComicStory.stop();$('#pipeline')&&($('#pipeline').hidden=true);for(const id of ['identities','drafts','editor'])$('#'+id).hidden=id!==view;}
+function show(view){if(window.ComicB)window.ComicB.stop();if(window.ComicFinish){ComicFinish.stop();$('#finish').hidden=true;}if(window.ComicStory)window.ComicStory.stop();$('#pipeline')&&($('#pipeline').hidden=true);for(const id of ['identities','drafts','editor'])$('#'+id).hidden=id!==view;}
 async function loadSession(){session=await api('/api/session');const user=session.users.find(u=>u.id===session.userId);$('#identity').textContent=user?''+user.name:'選擇本機身分';$('#location').textContent=(session.version||'舊版服務，請改用V0.3啟動入口')+' · 資料位置 '+session.dataDir;return user;}
 async function identities(){
   await loadSession();show('identities');
@@ -82,12 +82,13 @@ async function listDrafts(){if(!session.userId)return identities();show('drafts'
 function render(){show('editor');$('#title').value=draft.project.title;$('#export').disabled=!draft.id;$('#draftMeta').textContent=draft.id?`草稿 ${draft.id} · 修訂 ${draft.revision}`:'本頁編輯，尚未暫存';$('#panels').innerHTML=draft.project.panels.map((p,i)=>`<article class="panel" data-panel="${p.panelId}"><h3>第 ${i+1} 格</h3>${p.asset?`<img class="${p.fit}" src="${ComicAssets.url(p.asset)}" alt="第${i+1}格漫畫">`:'<p>等待圖片</p>'}<div class="actions"><button data-move="${i}" data-by="-1" ${i===0?'disabled':''}>←</button><button data-move="${i}" data-by="1" ${i===3?'disabled':''}>→</button><button data-replace="${i}">替換</button></div><label>停留秒數<input data-duration="${i}" type="number" min="1" max="30" step="0.1" value="${p.durationMs/1000}"></label><label>圖片呈現<select data-fit="${i}"><option value="contain" ${p.fit==='contain'?'selected':''}>完整顯示｜保留整張，不同比例補邊</option><option value="cover" ${p.fit==='cover'?'selected':''}>鋪滿畫面｜填滿直式，超出的部分裁切</option></select></label><label ${p.fit==='contain'?'hidden':''}>裁切左右<input data-crop="${i}" data-axis="x" type="range" min="0" max="100" value="${(p.crop?.x??.5)*100}"></label><label ${p.fit==='contain'?'hidden':''}>裁切上下<input data-crop="${i}" data-axis="y" type="range" min="0" max="100" value="${(p.crop?.y??.5)*100}"></label><button data-center="${i}">裁切回中央</button></article>`).join('');
   document.querySelectorAll('[data-move]').forEach(button=>button.onclick=()=>{const from=+button.dataset.move,to=from+(+button.dataset.by);const panels=draft.project.panels;[panels[from],panels[to]]=[panels[to],panels[from]];render();changed();});
   document.querySelectorAll('[data-replace]').forEach(button=>button.onclick=()=>{replacing=+button.dataset.replace;$('#replace').click();});
-  document.querySelectorAll('[data-duration]').forEach(input=>input.oninput=()=>{draft.project.panels[+input.dataset.duration].durationMs=Math.round(Number(input.value)*1000);changed();});
+  document.querySelectorAll('[data-duration]').forEach(input=>input.oninput=()=>{draft.project.panels[+input.dataset.duration].durationMs=Math.round(Number(input.value)*1000);if(window.ComicStory)ComicStory.refreshDurations();changed();});
   document.querySelectorAll('[data-fit]').forEach(input=>input.onchange=()=>{draft.project.panels[+input.dataset.fit].fit=input.value;render();changed();});
   const cropImage=i=>{const p=draft.project.panels[i],img=document.querySelectorAll('.panel')[i].querySelector('img');if(img)img.style.objectPosition=`${(p.crop?.x??.5)*100}% ${(p.crop?.y??.5)*100}%`;};
   draft.project.panels.forEach((_,i)=>cropImage(i));
   document.querySelectorAll('[data-crop]').forEach(input=>input.oninput=()=>{const i=+input.dataset.crop,p=draft.project.panels[i];p.crop={x:.5,y:.5,...p.crop,[input.dataset.axis]:Number(input.value)/100};p.fit='cover';cropImage(i);changed();});
   document.querySelectorAll('[data-center]').forEach(button=>button.onclick=()=>{draft.project.panels[+button.dataset.center].crop={x:.5,y:.5};render();changed();});
+  if(window.ComicFinish)ComicFinish.attach(draft);
   if(window.ComicStory)window.ComicStory.attach(draft);
   if(window.ComicB)window.ComicB.attach(draft).catch(error=>note(error.message,true));
 }

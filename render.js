@@ -10,7 +10,8 @@ window.ComicRender = (() => {
     return {kind:'outro',local:at};
   }
   function active(panel,ms){return panel.dialogue.filter(line=>ms>=line.startMs&&ms<line.endMs);}
-  function key(project,ms){const s=scene(project,ms);return s.kind==='panel'?s.panel.panelId+':'+active(s.panel,s.local).map(x=>x.lineId).join(','):s.kind;}
+  function narrationActive(panel,ms){const n=panel.narration;return n.enabled&&n.text&&ms>=(n.startMs??0)&&ms<(n.endMs??panel.durationMs);}
+  function key(project,ms){const s=scene(project,ms);return s.kind==='panel'?s.panel.panelId+':'+active(s.panel,s.local).map(x=>x.lineId).join(',')+':n'+narrationActive(s.panel,s.local):s.kind;}
   async function load(project){
     const images={};await document.fonts.ready;
     await Promise.all(project.panels.map(async panel=>{const image=new Image();image.src=ComicAssets.url(panel.asset);await image.decode();images[panel.asset]=image;}));
@@ -34,12 +35,15 @@ window.ComicRender = (() => {
     if(width+.01<(horizontal?180:126)||width>W+.01)throw new Error('文字框太窄，請加寬；字體不會縮小');
     ctx.font=`bold ${item.position==='bottom'?34:32}px "Microsoft JhengHei",sans-serif`;
     const textLines=horizontal?wrap(ctx,item.text,width-40):[];
-    const rows=Math.ceil(Array.from(item.text).length/2);
-    const height=horizontal?80+textLines.length*42:112+rows*43;
+    const chars=Array.from(item.text),columns=Math.max(1,Math.floor((width-30)/46));
+    const rows=Math.ceil(chars.length/columns);
+    const needed=horizontal?80+textLines.length*42:112+rows*43;
+    const height=(item.frame?.h!=null?item.frame.h*H:needed);
+    if(height+.01<needed)throw new Error('文字放不下目前框寬與框高，請拉大右下角或分句；沒有截字或縮字');
     const x=(item.frame?.x??(item.position==='right'?551/720:43/720))*W;
     const y=(item.frame?.y??(horizontal?(item.position?800:1012)/H:154/H))*H;
     if(![x,y,width,height].every(Number.isFinite)||x<0||y<0||x+width>W+.01||y+height>H+.01)throw new Error('文字框超出畫面，請移回或加寬；文字沒有截斷');
-    return {x,y,width,height,textLines,rows};
+    return {x,y,width,height,textLines,rows,columns};
   }
   function draw(canvas,project,ms,images){
     canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
@@ -63,16 +67,13 @@ window.ComicRender = (() => {
           ctx.font='bold 34px "Microsoft JhengHei",sans-serif';f.textLines.forEach((t,i)=>ctx.fillText(t,f.x+20,f.y+76+i*42));
         }else{
           const chars=Array.from(line.text),x=f.x;
-          if(chars.length>30)throw new Error('本輪直式台詞最多30字，請分成兩句；文字沒有截斷');
-          const rows=Math.ceil(chars.length/2);
-          // First-stop candidate: two fixed columns, read top-down/right-left.
-          // Font size stays constant. Human reading acceptance is still required.
+          const rows=f.rows;
           box(ctx,x,f.y,f.width,f.height,'rgba(10,30,49,.86)');box(ctx,x+(f.width-112)/2,f.y+11,112,45,color[line.role]||color.C);
           ctx.textAlign='center';ctx.fillStyle='#fff';ctx.font='bold 24px "Microsoft JhengHei",sans-serif';ctx.fillText(name,x+f.width/2,f.y+43);
-          ctx.font='bold 36px "Microsoft JhengHei",sans-serif';chars.forEach((ch,i)=>ctx.fillText(ch,x+f.width*(i<rows? .7:.3),f.y+99+(i%rows)*43));
+          ctx.font='bold 36px "Microsoft JhengHei",sans-serif';chars.forEach((ch,i)=>ctx.fillText(ch,x+f.width-15-(Math.floor(i/rows)+.5)*(f.width-30)/f.columns,f.y+99+(i%rows)*43));
         }
       }
-      if(panel.narration.enabled&&panel.narration.text){
+      if(narrationActive(panel,state.local)){
         const f=frame(ctx,panel.narration);
         box(ctx,f.x,f.y,f.width,f.height,'rgba(25,35,44,.88)');ctx.fillStyle='#d4efff';ctx.textAlign='left';ctx.font='bold 24px "Microsoft JhengHei",sans-serif';ctx.fillText(panel.narration.tag,f.x+20,f.y+34);
         ctx.fillStyle='#fff';ctx.font='bold 32px "Microsoft JhengHei",sans-serif';f.textLines.forEach((t,i)=>ctx.fillText(t,f.x+20,f.y+78+i*42));
@@ -85,5 +86,5 @@ window.ComicRender = (() => {
     }
     ctx.textAlign='right';ctx.font='20px "Microsoft JhengHei",sans-serif';ctx.fillStyle=state.kind==='panel'?'#fff':'#1475d4';ctx.fillText('ComicPod',W-28,H-25);
   }
-  return {total,scene,key,load,draw,panelLayout,frame};
+  return {total,scene,key,load,draw,panelLayout,frame,narrationActive};
 })();
