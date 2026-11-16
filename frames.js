@@ -19,15 +19,19 @@ window.ComicFrames=(()=>{
       const position=()=>{const f=ComicRender.frame(ctx,item);Object.assign(outline.style,{left:f.x/720*100+'%',top:f.y/1280*100+'%',width:f.width/720*100+'%',height:f.height/1280*100+'%'});};position();
       for(const kind of ['move','width']){
         const button=document.createElement('button');button.className='frame-handle '+kind;button.textContent=kind==='move'?'✥':'⤢';button.setAttribute('aria-label',`${kind==='move'?'移動':'調寬高'}文字框${i+1}`);
-        button.onpointerdown=e=>{if(drag)return;e.preventDefault();const f=ComicRender.frame(ctx,item);drag={el:button,id:e.pointerId,x:e.clientX,y:e.clientY,base:{x:f.x/720,y:f.y/1280,w:f.width/720,h:f.height/1280},old:item.frame?{...item.frame}:null};button.setPointerCapture(e.pointerId);};
-        button.onpointermove=e=>{if(!drag||drag.el!==button||drag.id!==e.pointerId)return;e.preventDefault();const r=q('storyCanvas').getBoundingClientRect(),dx=(e.clientX-drag.x)/r.width,dy=(e.clientY-drag.y)/r.height,old=item.frame;
+        button.onpointerdown=e=>{if(drag)return;e.preventDefault();e.stopPropagation();const f=ComicRender.frame(ctx,item),r=q('storyCanvas').getBoundingClientRect();drag={el:button,id:e.pointerId,x:e.clientX,y:e.clientY,scaleX:r.width,scaleY:r.height,base:{x:f.x/720,y:f.y/1280,w:f.width/720,h:f.height/1280},old:item.frame?{...item.frame}:null};button.setPointerCapture(e.pointerId);outline.classList.add('selected');};
+        button.onpointermove=e=>{if(!drag||drag.el!==button||drag.id!==e.pointerId)return;e.preventDefault();e.stopPropagation();const dx=(e.clientX-drag.x)/drag.scaleX,dy=(e.clientY-drag.y)/drag.scaleY,old=item.frame;
           item.frame=kind==='move'?{...drag.base,x:Math.max(0,Math.min(1-drag.base.w,drag.base.x+dx)),y:Math.max(0,Math.min(1-drag.base.h,drag.base.y+dy))}:{...drag.base,w:Math.min(1-drag.base.x,drag.base.w+dx),h:Math.min(1-drag.base.y,drag.base.h+dy)};
-          try{ComicRender.frame(ctx,item);if(!repaint())throw Error(q('previewError').textContent);position();q('frameMessage').textContent='放開把手後按完成或取消。';}catch(error){item.frame=old;repaint();q('frameMessage').textContent=error.message;}
+          // Stop at the closest valid point instead of freezing both resize axes.
+          const target={...item.frame};let warning='';
+          try{ComicRender.frame(ctx,item);}catch(error){warning=error.message;let lo=0,hi=1;for(let k=0;k<12;k++){const t=(lo+hi)/2;item.frame={x:old?.x??drag.base.x,y:old?.y??drag.base.y,w:old?.w??drag.base.w,h:old?.h??drag.base.h};for(const key of ['x','y','w','h'])item.frame[key]+=(target[key]-item.frame[key])*t;try{ComicRender.frame(ctx,item);lo=t;}catch{hi=t;}}item.frame={};for(const key of ['x','y','w','h']){const a=old?.[key]??drag.base[key];item.frame[key]=a+(target[key]-a)*lo;}}
+          if(repaint())position();else{item.frame=old;repaint();position();}
+          q('frameMessage').textContent=warning||'放開把手後按完成或取消。';
         };
-        const release=e=>{if(!drag||drag.el!==button||drag.id!==e.pointerId)return;if(e.type!=='pointerup'){if(drag.old)item.frame=drag.old;else delete item.frame;repaint();position();}drag=null;if(button.hasPointerCapture(e.pointerId))button.releasePointerCapture(e.pointerId);};
+        const release=e=>{if(!drag||drag.el!==button||drag.id!==e.pointerId)return;if(e.type!=='pointerup'){if(drag.old)item.frame=drag.old;else delete item.frame;repaint();position();}drag=null;outline.classList.remove('selected');if(button.hasPointerCapture(e.pointerId))button.releasePointerCapture(e.pointerId);};
         button.onpointerup=release;button.onpointercancel=release;button.onlostpointercapture=release;outline.append(button);
       }host.append(outline);
     });
   }
-  return {begin,finish};
+  return {begin,finish,isActive:()=>!!state};
 })();

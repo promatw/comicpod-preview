@@ -1,0 +1,5 @@
+ComicPod BGM — HM approved 2026-11-16
+G01 窗邊的午後 / G02 慢慢靠近 / P01 口袋裡的小默契 / P02 轉角遇見你
+Music arranged by ADC for HM. Instruments: GeneralUser GS 2.0.3 / S. Christian Collins.
+These are rendered music recordings, not the soundfont. See GeneralUser_LICENSE.txt.
+Loop masters provided by ADC; MP3 conversions prepared for web playback.

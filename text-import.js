@@ -36,7 +36,7 @@ window.ComicText=(()=>{
 1 [00:00.00-00:06.00] (人物A) 今天一起去買零食吧。
 1 [00:02.00-00:04.00] (敘事) 剛剛，他們走進便利商店。
 2 (人物B) 我找到想吃的那包了。</pre><p>也可以完全不加標記，每行一句，使用上方選格與人物。</p></details><div id="txtPreview" class="txt-preview"></div><p id="txtStatus" role="status"></p><div class="actions"><button id="txtApply" disabled>確認新增這些句子</button><button id="txtUndo" disabled>還原上一次匯入</button></div>`;
-    document.querySelector('.story-controls').append(host);
+    const fold=document.createElement('details');fold.id='txtDetails';fold.className='story-option';const summary=document.createElement('summary');summary.textContent='匯入 TXT／看範例';fold.append(summary,host);document.querySelector('.story-controls').append(fold);
     const q=id=>document.getElementById(id);let text='',parsed=null,before=null;
     function preview(){
       parsed=parse(text,getProject(),Number(q('txtPanel').value),q('txtRole').value);
@@ -57,7 +57,8 @@ window.ComicText=(()=>{
       const snapshot=structuredClone(project);applied(next);before=snapshot;q('txtUndo').disabled=false;q('txtApply').disabled=true;q('txtStatus').textContent='已新增，可在豆二調整，亦可還原這次匯入。';
     };
     q('txtUndo').onclick=()=>{if(!before)return;if(!confirm('還原到上次匯入前？匯入後的其他編輯也會回復。'))return;applied(before);before=null;q('txtUndo').disabled=true;q('txtStatus').textContent='已還原匯入前內容。';};
-    return {refresh(){q('txtPanel').innerHTML=getProject().panels.map((p,i)=>`<option value="${i}">第${i+1}格（${p.durationMs/1000}秒）</option>`).join('');q('txtPanel').value=getSelected();text='';parsed=null;before=null;q('txtPreview').replaceChildren();q('txtStatus').textContent='';q('txtApply').disabled=q('txtUndo').disabled=true;}};
+    function syncPanels(){const selected=q('txtPanel').value;q('txtPanel').innerHTML=getProject().panels.map((p,i)=>`<option value="${i}">第${i+1}格（${p.durationMs/1000}秒）</option>`).join('');q('txtPanel').value=selected||getSelected();if(text&&parsed)preview();}
+    return {syncPanels,refresh(){q('txtPanel').innerHTML=getProject().panels.map((p,i)=>`<option value="${i}">第${i+1}格（${p.durationMs/1000}秒）</option>`).join('');q('txtPanel').value=getSelected();text='';parsed=null;before=null;q('txtPreview').replaceChildren();q('txtStatus').textContent='';q('txtApply').disabled=q('txtUndo').disabled=true;}};
   }
   return {parse,install};
 })();

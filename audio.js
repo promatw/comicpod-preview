@@ -1,31 +1,39 @@
-/* Offline PCM: same oscillator, loop, volume and envelope as video.py. */
+/* Approved ADC recordings. Decode once; render volume/loop/fades offline. */
 window.ComicAudio=(()=>{
-  let element=null,raf=0,cachedKey='',url='';
-  function stop(){cancelAnimationFrame(raf);if(element){element.pause();element=null;}}
-  function make(project){
-    const settings=project.bgm,total=ComicRender.total(project)/1000,key=JSON.stringify([total,settings]);
-    if(key===cachedKey)return url;
-    stop();if(url)URL.revokeObjectURL(url);
-    const rate=44100,count=Math.round(total*rate),data=new ArrayBuffer(44+count*2),v=new DataView(data);
-    const ascii=(at,s)=>{for(let i=0;i<s.length;i++)v.setUint8(at+i,s.charCodeAt(i));};
-    ascii(0,'RIFF');v.setUint32(4,36+count*2,true);ascii(8,'WAVE');ascii(12,'fmt ');v.setUint32(16,16,true);v.setUint16(20,1,true);v.setUint16(22,1,true);v.setUint32(24,rate,true);v.setUint32(28,rate*2,true);v.setUint16(32,2,true);v.setUint16(34,16,true);ascii(36,'data');v.setUint32(40,count*2,true);
-    const notes=settings.kind==='gentle'?[261.63,329.63,392,329.63,293.66,349.23,440,349.23]:[392,493.88,587.33,493.88,440,523.25,659.25,523.25];
-    const fadein=settings.fadeInMs/1000,fadeout=settings.fadeOutMs/1000,volume=settings.volume/100*.65;
-    if(settings.kind!=='none')for(let i=0;i<count;i++){
-      const t=i/rate,part=t%1.25;
-      let envelope=Math.min(1,part/.06)*Math.exp(-5*Math.max(0,part-.06))*Math.min(1,Math.max(0,(1.23-part)/.08));
-      envelope*=fadein?Math.min(1,t/fadein):1;envelope*=fadeout?Math.min(1,Math.max(0,(total-t)/fadeout)):1;
-      const phase=Math.sin(2*Math.PI*notes[Math.floor(t/1.25)%8]*part),osc=settings.kind==='gentle'?phase:2/Math.PI*Math.asin(phase);
-      v.setInt16(44+i*2,Math.trunc(osc*.085*volume*envelope*32767),true);
+  const tracks={G01:'窗邊的午後',G02:'慢慢靠近',P01:'口袋裡的小默契',P02:'轉角遇見你'};
+  const decoded=new Map();let context=null,source=null,raf=0,generation=0,cacheKey='',cached=null;
+  const id=kind=>kind==='gentle'?'G01':kind==='playful'?'P01':kind;
+  function stop(){generation++;cancelAnimationFrame(raf);if(source){source.onended=null;try{source.stop();}catch{}source=null;}}
+  async function load(kind){
+    kind=id(kind);if(!tracks[kind])throw Error('找不到這首配樂，請重新選擇。');
+    if(!decoded.has(kind))decoded.set(kind,(async()=>{const r=await fetch('music/'+kind+'.mp3');if(!r.ok)throw Error('配樂載入失敗，請檢查連線後重試。');return new OfflineAudioContext(2,1,32000).decodeAudioData(await r.arrayBuffer());})().catch(error=>{decoded.delete(kind);throw error;}));
+    return decoded.get(kind);
+  }
+  async function make(project){
+    const seconds=ComicRender.total(project)/1000,settings=project.bgm,key=JSON.stringify([seconds,settings]);
+    if(key===cacheKey&&cached)return cached;
+    if(!Number.isFinite(seconds)||seconds<=0||seconds>150)throw Error('作品長度須在150秒內。');
+    const offline=new OfflineAudioContext(2,Math.ceil(seconds*32000),32000);
+    if(settings.kind!=='none'){
+      const buffer=await load(settings.kind),s=offline.createBufferSource(),gain=offline.createGain();s.buffer=buffer;s.loop=true;s.connect(gain);gain.connect(offline.destination);
+      const volume=Math.max(0,Math.min(100,settings.volume))/100,fi=Math.min(seconds,settings.fadeInMs/1000),fo=Math.min(seconds,settings.fadeOutMs/1000);
+      const count=Math.max(2,Math.ceil(seconds*100)+1),curve=new Float32Array(count);
+      for(let i=0;i<count;i++){const t=i/(count-1)*seconds;curve[i]=volume*(fi?Math.min(1,t/fi):1)*(fo?Math.min(1,(seconds-t)/fo):1);}
+      gain.gain.setValueCurveAtTime(curve,0,seconds);s.start(0);s.stop(seconds);
     }
-    url=URL.createObjectURL(new Blob([data],{type:'audio/wav'}));cachedKey=key;return url;
+    const buffer=await offline.startRendering();cacheKey=key;cached=buffer;return buffer;
   }
   async function play(project,from,onTime,onEnd=()=>{}){
-    stop();const sound=new Audio(make(project));element=sound;
-    try{await sound.play();if(element!==sound){sound.pause();return;}sound.currentTime=from/1000;
-      const tick=()=>{if(element!==sound)return;if(sound.ended){stop();onEnd();return;}onTime(sound.currentTime*1000);raf=requestAnimationFrame(tick);};tick();
-    }catch(error){if(element!==sound)return;stop();throw Error('聲音未能播放，請再按試聽。'+error.message);}
+    stop();const token=generation;
+    try{
+      context=context||new (window.AudioContext||window.webkitAudioContext)();await context.resume();
+      const buffer=await make(project);if(token!==generation)return;
+      const node=context.createBufferSource();node.buffer=buffer;node.connect(context.destination);source=node;
+      const offset=Math.max(0,Math.min(from/1000,buffer.duration-.001)),began=context.currentTime;
+      node.onended=()=>{if(token!==generation)return;source=null;cancelAnimationFrame(raf);onEnd();};node.start(0,offset);
+      const tick=()=>{if(token!==generation||source!==node)return;onTime(Math.min(buffer.duration,offset+context.currentTime-began)*1000);raf=requestAnimationFrame(tick);};tick();
+    }catch(error){if(token!==generation)return;stop();throw Error('配樂未能播放：'+error.message);}
   }
   window.addEventListener('beforeunload',stop);
-  return {make,play,stop};
+  return {make,play,stop,tracks,normalize:id};
 })();

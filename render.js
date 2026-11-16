@@ -36,14 +36,19 @@ window.ComicRender = (() => {
     ctx.font=`bold ${item.position==='bottom'?34:32}px "Microsoft JhengHei",sans-serif`;
     const textLines=horizontal?wrap(ctx,item.text,width-40):[];
     const chars=Array.from(item.text),columns=Math.max(1,Math.floor((width-30)/46));
-    const rows=Math.ceil(chars.length/columns);
-    const needed=horizontal?80+textLines.length*42:112+rows*43;
-    const height=(item.frame?.h!=null?item.frame.h*H:needed);
+    const autoRows=Math.max(1,Math.ceil(chars.length/columns));
+    const height=item.frame?.h!=null?item.frame.h*H:(horizontal?80+textLines.length*42:112+autoRows*43);
+    // Vertical Chinese fills each column top-to-bottom, then moves right-to-left.
+    // Height determines characters per column; width determines available columns.
+    const rows=horizontal?0:Math.max(1,Math.floor((height-112+.01)/43));
+    const usedColumns=horizontal?0:Math.max(1,Math.ceil(chars.length/rows));
+    const needed=horizontal?80+textLines.length*42:112+Math.min(rows,Math.max(1,chars.length))*43;
+    if(!horizontal&&usedColumns>columns)throw new Error('文字放不下目前框寬與框高，請拉大右下角或分句；沒有截字或縮字');
     if(height+.01<needed)throw new Error('文字放不下目前框寬與框高，請拉大右下角或分句；沒有截字或縮字');
     const x=(item.frame?.x??(item.position==='right'?551/720:43/720))*W;
     const y=(item.frame?.y??(horizontal?(item.position?800:1012)/H:154/H))*H;
     if(![x,y,width,height].every(Number.isFinite)||x<0||y<0||x+width>W+.01||y+height>H+.01)throw new Error('文字框超出畫面，請移回或加寬；文字沒有截斷');
-    return {x,y,width,height,textLines,rows,columns};
+    return {x,y,width,height,textLines,rows,columns,usedColumns};
   }
   function draw(canvas,project,ms,images){
     canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
