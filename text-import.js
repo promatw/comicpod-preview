@@ -41,7 +41,7 @@ window.ComicText=(()=>{
     function preview(){
       parsed=parse(text,getProject(),Number(q('txtPanel').value),q('txtRole').value);
       q('txtPreview').innerHTML='<table><thead><tr><th>行</th><th>格／人物</th><th>格內秒數</th><th>文字／錯誤</th></tr></thead><tbody>'+parsed.rows.map(r=>`<tr class="${r.error?'bad':''}"><td>${r.number}</td><td>${r.definition?'人物'+r.definition:(r.panel+1)+'／'+r.role}</td><td>${r.definition?'—':(r.startMs/1000)+'–'+(r.endMs/1000)+(r.suggested?'（建議）':'')}</td><td>${escapeHTML(r.error||r.text||r.name)}</td></tr>`).join('')+'</tbody></table>';
-      q('txtApply').disabled=!parsed.rows.some(r=>!r.definition)||parsed.rows.some(r=>r.error);q('txtStatus').textContent=q('txtApply').disabled?'請修正列出的錯誤後重新選檔；尚未改動草稿。':'確認格次、人物與格內時間後再新增；既有內容保留。';
+      q('txtApply').disabled=!parsed.rows.some(r=>!r.definition)||parsed.rows.some(r=>r.error);q('txtStatus').textContent=q('txtApply').disabled?'請修正列出的錯誤後重新預覽或選檔；尚未改動草稿。':'確認格次、人物與格內時間後再新增；既有內容保留。';
     }
     q('txtFile').onchange=async e=>{const file=e.target.files[0];e.target.value='';if(!file)return;try{if(file.size>1024*1024)throw Error('TXT請小於1MB');text=new TextDecoder('utf-8',{fatal:true}).decode(await file.arrayBuffer());preview();}catch(error){q('txtStatus').textContent='讀取失敗：請用UTF-8純文字。'+error.message;q('txtApply').disabled=true;}};
     q('txtPanel').onchange=q('txtRole').onchange=()=>{if(text)preview();};
@@ -58,7 +58,7 @@ window.ComicText=(()=>{
     };
     q('txtUndo').onclick=()=>{if(!before)return;if(!confirm('還原到上次匯入前？匯入後的其他編輯也會回復。'))return;applied(before);before=null;q('txtUndo').disabled=true;q('txtStatus').textContent='已還原匯入前內容。';};
     function syncPanels(){const selected=q('txtPanel').value;q('txtPanel').innerHTML=getProject().panels.map((p,i)=>`<option value="${i}">第${i+1}格（${p.durationMs/1000}秒）</option>`).join('');q('txtPanel').value=selected||getSelected();if(text&&parsed)preview();}
-    return {syncPanels,refresh(){q('txtPanel').innerHTML=getProject().panels.map((p,i)=>`<option value="${i}">第${i+1}格（${p.durationMs/1000}秒）</option>`).join('');q('txtPanel').value=getSelected();text='';parsed=null;before=null;q('txtPreview').replaceChildren();q('txtStatus').textContent='';q('txtApply').disabled=q('txtUndo').disabled=true;}};
+    return {syncPanels,previewText(value){if(new TextEncoder().encode(value).length>1024*1024){q('txtStatus').textContent='文字請小於1MB';q('txtApply').disabled=true;return;}text=value;fold.open=true;preview();fold.scrollIntoView({behavior:'smooth',block:'start'});},refresh(){q('txtPanel').innerHTML=getProject().panels.map((p,i)=>`<option value="${i}">第${i+1}格（${p.durationMs/1000}秒）</option>`).join('');q('txtPanel').value=getSelected();text='';parsed=null;before=null;q('txtPreview').replaceChildren();q('txtStatus').textContent='';q('txtApply').disabled=q('txtUndo').disabled=true;}};
   }
   return {parse,install};
 })();

@@ -42,7 +42,7 @@ window.ComicBrowser=(()=>{
     }catch(error){throw Error('圖片處理失敗：'+error.message);}finally{URL.revokeObjectURL(url);}
   }
   async function api(path,body){
-    if(path==='/api/session'){await database();return {version:'V0.5-phone.1',userId:'this-device',users:[{id:'this-device',name:'這台裝置'}],dataDir:'此裝置・此瀏覽器，圖片不上傳；清除網站資料或無痕模式可能使草稿消失'};}
+    if(path==='/api/session'){await database();return {version:'V0.5-phone.2',userId:'this-device',users:[{id:'this-device',name:'這台裝置'}],dataDir:'此裝置・此瀏覽器，圖片不上傳；清除網站資料或無痕模式可能使草稿消失'};}
     if(path==='/api/upload')return upload(body);
     if(path==='/api/drafts')return transact(['drafts'],'readonly',(tx,done)=>{const r=tx.objectStore('drafts').getAll();r.onsuccess=()=>done(r.result.sort((a,b)=>b.updated-a.updated).map(x=>({id:x.id,title:x.project.title,revision:x.revision})));});
     if(path.startsWith('/api/draft/')){const value=await transact(['drafts'],'readonly',(tx,done)=>{const r=tx.objectStore('drafts').get(path.split('/').pop());r.onsuccess=()=>done(r.result);});if(!value)throw Error('找不到這台裝置的草稿。');return hydrate(value);}

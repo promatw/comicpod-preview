@@ -1,6 +1,6 @@
 'use strict';
 const TEXT = {
-  local:'V0.5-phone.1 · 手機操作預覽', headline:'四張圖，一段你寫的故事。',
+  local:'V0.5-phone.2 · 手機操作預覽', headline:'四張圖，一段你寫的故事。',
   intro:'從上圖、調整順序開始，到豆二寫台詞，馬上看滿版圖文試播。',
   new:'＋ 建立草稿', import:'匯入作品包', mine:'我的草稿', bean1:'豆一・漫畫素材',
   save:'保存草稿', export:'匯出可編輯作品包', title:'作品名稱', four:'上傳四張圖片', grid:'上傳一張 2×2 合圖',

@@ -149,5 +149,5 @@ window.ComicStory=(()=>{
   function captureEdit(){return hasPending()?{panelId:panel().panelId,editId,linePending,rolesPending,narrationPending,values:Object.fromEntries(editFields.map(id=>[id,q(id).type==='checkbox'?q(id).checked:q(id).value]))}:null;}
   function restoreEdit(buffer){if(!buffer||buffer.panelId!==panel().panelId)return;for(const [id,value] of Object.entries(buffer.values||{})){if(!editFields.includes(id))continue;if(q(id).type==='checkbox')q(id).checked=!!value;else q(id).value=value;}editId=buffer.editId;linePending=!!buffer.linePending;rolesPending=!!buffer.rolesPending;narrationPending=!!buffer.narrationPending;if(rolesPending)q('roleDetails').open=true;if(narrationPending)q('narrationDetails').open=true;}
   q('writeLine').onclick=q('backToLines').onclick=()=>{q('lineEditor').scrollIntoView({behavior:'smooth',block:'start'});};
-  return {attach,stop,prepareSave,go,refreshDurations,hasPending,captureEdit};
+  return {attach,stop,prepareSave,go,refreshDurations,hasPending,captureEdit,previewText:value=>textImporter.previewText(value)};
 })();
